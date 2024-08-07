@@ -57,6 +57,7 @@ var SmartBanner = function (options) {
 		theme: '', // put platform type ('ios', 'android', etc.) here to force single theme on all device
 		icon: '', // full path to icon image if not using website icon image
 		force: '', // put platform type ('ios', 'android', etc.) here for emulation
+		placement: 'top' // put where you want the banner to be displayed ('top', 'bottom')
 
 	}, options || {});
 
@@ -157,6 +158,7 @@ SmartBanner.prototype = {
 	},
 	hide: function () {
 		root.classList.remove('smartbanner-show');
+		root.classList.remove('smartbanner-' + this.options.placement);
 
 		if (typeof this.options.close === 'function') {
 			return this.options.close();
@@ -164,6 +166,8 @@ SmartBanner.prototype = {
 	},
 	show: function () {
 		root.classList.add('smartbanner-show');
+		root.classList.add('smartbanner-' + this.options.placement);
+
 		if (typeof this.options.show === 'function') {
 			return this.options.show();
 		}

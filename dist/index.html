@@ -1,0 +1,40 @@
+<html>
+<head>
+    <title>MyPage</title>
+    <meta name="apple-itunes-app" content="app-id=502838820">
+    <meta name="google-play-app" content="app-id=ru.hh.android">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <link rel="stylesheet" href="./smart-app-banner.min.css" type="text/css" media="screen">
+    <link rel="apple-touch-icon" href="http://lh3.ggpht.com/f4oX61ljZ6x8aYDELZOgxlvdUEu73-wSQ4fy5bx6fCRISnZP8T353wdaM43RO_DbGg=w300">
+    <link rel="android-touch-icon" href="http://lh3.ggpht.com/f4oX61ljZ6x8aYDELZOgxlvdUEu73-wSQ4fy5bx6fCRISnZP8T353wdaM43RO_DbGg=w300">
+</head>
+<body>
+...
+<script src="./smart-app-banner.min.js"></script>
+<script type="text/javascript">
+    new SmartBanner({
+        daysHidden: 15,   // days to hide banner after close button is clicked (defaults to 15)
+        daysReminder: 90, // days to hide banner after "VIEW" button is clicked (defaults to 90)
+        appStoreLanguage: 'us', // language code for the App Store (defaults to user's browser language)
+        title: 'MyPage',
+        author: 'MyCompany LLC',
+        button: 'View',
+        store: {
+            ios: 'On the App Store',
+            android: 'In Google Play',
+            windows: 'In Windows store'
+        },
+        price: {
+            ios: 'FREE',
+            android: 'FREE',
+            windows: 'FREE'
+        }
+        , theme: 'ios-black' // put platform type ('ios', 'android', etc.) here to force single theme on all device
+        // , icon: '' // full path to icon image if not using website icon image
+        // , force: 'ios' // Uncomment for platform emulation
+        , placement: 'bottom' // put the banner at the top ('top') or bottom ('bottom') of the screen
+    });
+</script>
+</body>
+</html>
