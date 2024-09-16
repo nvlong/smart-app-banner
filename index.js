@@ -102,8 +102,6 @@ var SmartBanner = function (options) {
         return;
     }
 
-    this.create();
-
     if (this.options.lazy) {
         var self = this,
             autoLoadDuration = 5000,
@@ -121,6 +119,7 @@ var SmartBanner = function (options) {
         }
 
         function runScripts() {
+            self.create();
             self.show();
         }
 
@@ -130,6 +129,7 @@ var SmartBanner = function (options) {
             });
         });
     } else {
+        this.create();
         this.show();
     }
 };
