@@ -15,198 +15,226 @@ var root = doc && doc.documentElement;
 
 // platform dependent functionality
 var mixins = {
-	ios: {
-		appMeta: 'apple-itunes-app',
-		iconRels: ['apple-touch-icon-precomposed', 'apple-touch-icon'],
-		getStoreLink: function () {
-			return 'https://itunes.apple.com/' + this.options.appStoreLanguage + '/app/id' + this.appId + "?mt=8";
-		}
-	},
-	android: {
-		appMeta: 'google-play-app',
-		iconRels: ['android-touch-icon', 'apple-touch-icon-precomposed', 'apple-touch-icon'],
-		getStoreLink: function () {
-			return 'http://play.google.com/store/apps/details?id=' + this.appId;
-		}
-	},
-	windows: {
-		appMeta: 'msApplication-ID',
-		iconRels: ['windows-touch-icon', 'apple-touch-icon-precomposed', 'apple-touch-icon'],
-		getStoreLink: function () {
-			return 'http://www.windowsphone.com/s?appid=' + this.appId;
-		}
-	}
+    ios: {
+        appMeta: 'apple-itunes-app',
+        iconRels: ['apple-touch-icon-precomposed', 'apple-touch-icon'],
+        getStoreLink: function () {
+            return 'https://itunes.apple.com/' + this.options.appStoreLanguage + '/app/id' + this.appId + "?mt=8";
+        }
+    },
+    android: {
+        appMeta: 'google-play-app',
+        iconRels: ['android-touch-icon', 'apple-touch-icon-precomposed', 'apple-touch-icon'],
+        getStoreLink: function () {
+            return 'http://play.google.com/store/apps/details?id=' + this.appId;
+        }
+    },
+    windows: {
+        appMeta: 'msApplication-ID',
+        iconRels: ['windows-touch-icon', 'apple-touch-icon-precomposed', 'apple-touch-icon'],
+        getStoreLink: function () {
+            return 'http://www.windowsphone.com/s?appid=' + this.appId;
+        }
+    }
 };
 
 var SmartBanner = function (options) {
-	var agent = ua(navigator.userAgent);
-	this.options = extend({}, {
-		daysHidden: 15,
-		daysReminder: 90,
-		appStoreLanguage: userLang, // Language code for App Store
-		button: 'OPEN', // Text for the install button
-		store: {
-			ios: 'On the App Store',
-			android: 'In Google Play',
-			windows: 'In the Windows Store'
-		},
-		price: {
-			ios: 'FREE',
-			android: 'FREE',
-			windows: 'FREE'
-		},
-		theme: '', // put platform type ('ios', 'android', etc.) here to force single theme on all device
-		icon: '', // full path to icon image if not using website icon image
-		force: '', // put platform type ('ios', 'android', etc.) here for emulation
-		placement: 'top' // put where you want the banner to be displayed ('top', 'bottom')
+    var agent = ua(navigator.userAgent);
+    this.options = extend({}, {
+        daysHidden: 15,
+        daysReminder: 90,
+        appStoreLanguage: userLang, // Language code for App Store
+        button: 'OPEN', // Text for the install button
+        store: {
+            ios: 'On the App Store',
+            android: 'In Google Play',
+            windows: 'In the Windows Store'
+        },
+        price: {
+            ios: 'FREE',
+            android: 'FREE',
+            windows: 'FREE'
+        },
+        theme: '', // put platform type ('ios', 'android', etc.) here to force single theme on all device
+        icon: '', // full path to icon image if not using website icon image
+        force: '', // put platform type ('ios', 'android', etc.) here for emulation
+        placement: 'top', // put where you want the banner to be displayed ('top', 'bottom')
+        lazy: false, // lazy load banner only when user interacts with page
+    }, options || {});
 
-	}, options || {});
+    if (this.options.force) {
+        this.type = this.options.force;
+    } else if (agent.os.name === 'Windows Phone' || agent.os.name === 'Windows Mobile') {
+        this.type = 'windows';
+    } else if (agent.os.name === 'iOS') {
+        this.type = 'ios';
+    } else if (agent.os.name === 'Android') {
+        this.type = 'android';
+    }
 
-	if (this.options.force) {
-		this.type = this.options.force;
-	} else if (agent.os.name === 'Windows Phone' || agent.os.name === 'Windows Mobile') {
-		this.type = 'windows';
-	} else if (agent.os.name === 'iOS') {
-		this.type = 'ios';
-	} else if (agent.os.name === 'Android') {
-		this.type = 'android';
-	}
+    // Don't show banner on ANY of the following conditions:
+    // - device os is not supported,
+    // - user is on mobile safari for ios 6 or greater (iOS >= 6 has native support for SmartAppBanner)
+    // - running on standalone mode
+    // - user dismissed banner
+    var unsupported = !this.type || !this.options.store[this.type];
+    if (unsupported) {
+        return;
+    }
 
-	// Don't show banner on ANY of the following conditions:
-	// - device os is not supported,
-	// - user is on mobile safari for ios 6 or greater (iOS >= 6 has native support for SmartAppBanner)
-	// - running on standalone mode
-	// - user dismissed banner
-	var unsupported = !this.type || !this.options.store[this.type];
-	if (unsupported) {
-		return;
-	}
+    this.appMeta = mixins[this.type].appMeta;
+    this.parseAppId();
 
-	this.appMeta = mixins[this.type].appMeta;
-	this.parseAppId();
+    var isMobileSafari = (this.type === 'ios' && agent.browser.name === 'Mobile Safari' && parseInt(agent.os.version, 10) >= 6);
 
-	var isMobileSafari = (this.type === 'ios' && agent.browser.name === 'Mobile Safari' && parseInt(agent.os.version, 10) >= 6);
+    var runningStandAlone = navigator.standalone;
+    var userDismissed = cookie.get(this.appId + '-smartbanner-closed');
+    var userInstalled = cookie.get(this.appId + '-smartbanner-installed');
 
-	var runningStandAlone = navigator.standalone;
-	var userDismissed = cookie.get(this.appId + '-smartbanner-closed');
-	var userInstalled = cookie.get(this.appId + '-smartbanner-installed');
+    if (isMobileSafari || runningStandAlone || userDismissed || userInstalled) {
+        return;
+    }
 
-	if (isMobileSafari || runningStandAlone || userDismissed || userInstalled) {
-		return;
-	}
+    extend(this, mixins[this.type]);
 
-	extend(this, mixins[this.type]);
+    // - If we dont have app id in meta, dont display the banner
+    // - If opened in safari IOS, dont display the banner
+    if (!this.appId && agent.os.name === 'IOS' && agent.browser.name === 'Safari') {
+        return;
+    }
 
-	// - If we dont have app id in meta, dont display the banner
-	// - If opened in safari IOS, dont display the banner
-	if (!this.appId && agent.os.name === 'IOS' && agent.browser.name === 'Safari') {
-		return;
-	}
+    this.create();
 
-	this.create();
-	this.show();
+    if (this.options.lazy) {
+        var self = this,
+            autoLoadDuration = 5000,
+            eventList = ["wheel", "touchmove"],
+            autoLoadTimeout = setTimeout(runScripts, autoLoadDuration);
+
+        function triggerScripts() {
+            runScripts();
+            clearTimeout(autoLoadTimeout);
+            eventList.forEach(function (a) {
+                window.removeEventListener(a, triggerScripts, {
+                    passive: true
+                });
+            });
+        }
+
+        function runScripts() {
+            self.show();
+        }
+
+        eventList.forEach(function (a) {
+            window.addEventListener(a, triggerScripts, {
+                passive: true
+            });
+        });
+    } else {
+        this.show();
+    }
 };
 
 SmartBanner.prototype = {
-	constructor: SmartBanner,
+    constructor: SmartBanner,
 
-	create: function () {
-		var link = this.getStoreLink();
-		var inStore = this.options.price[this.type] + ' - ' + this.options.store[this.type];
-		var icon;
+    create: function () {
+        var link = this.getStoreLink();
+        var inStore = this.options.price[this.type] + ' - ' + this.options.store[this.type];
+        var icon;
 
-		if (this.options.icon) {
-			icon = this.options.icon;
-		} else {
-			for (var i = 0; i < this.iconRels.length; i++) {
-				var rel = q('link[rel="' + this.iconRels[i] + '"]');
+        if (this.options.icon) {
+            icon = this.options.icon;
+        } else {
+            for (var i = 0; i < this.iconRels.length; i++) {
+                var rel = q('link[rel="' + this.iconRels[i] + '"]');
 
-				if (rel) {
-					icon = rel.getAttribute('href');
-					break;
-				}
-			}
-		}
+                if (rel) {
+                    icon = rel.getAttribute('href');
+                    break;
+                }
+            }
+        }
 
-		var sb = doc.createElement('div');
-		var theme = this.options.theme || this.type;
+        var sb = doc.createElement('div');
+        var theme = this.options.theme || this.type;
 
-		sb.className = 'smartbanner smartbanner-' + theme;
-		sb.innerHTML = '<div class="smartbanner-container">' +
-							'<a href="javascript:void(0);" class="smartbanner-close">&times;</a>' +
-							'<span class="smartbanner-icon" style="background-image: url(' + icon + ')"></span>' +
-							'<div class="smartbanner-info">' +
-								'<div class="smartbanner-title">' + this.options.title + '</div>' +
-								'<div>' + this.options.author + '</div>' +
-								'<span>' + inStore + '</span>' +
-							'</div>' +
-							'<a href="' + link + '" class="smartbanner-button">' +
-								'<span class="smartbanner-button-text">' + this.options.button + '</span>' +
-							'</a>' +
-						'</div>';
+        sb.className = 'smartbanner smartbanner-' + theme;
+        sb.innerHTML = '<div class="smartbanner-container">' +
+            '<a href="javascript:void(0);" class="smartbanner-close">&times;</a>' +
+            '<span class="smartbanner-icon" style="background-image: url(' + icon + ')"></span>' +
+            '<div class="smartbanner-info">' +
+            '<div class="smartbanner-title">' + this.options.title + '</div>' +
+            '<div>' + this.options.author + '</div>' +
+            '<span>' + inStore + '</span>' +
+            '</div>' +
+            '<a href="' + link + '" class="smartbanner-button">' +
+            '<span class="smartbanner-button-text">' + this.options.button + '</span>' +
+            '</a>' +
+            '</div>';
 
-		// there isn’t neccessary a body
-		if (doc.body) {
-			doc.body.appendChild(sb);
-		}		else if (doc) {
-			doc.addEventListener('DOMContentLoaded', function () {
-				doc.body.appendChild(sb);
-			});
-		}
+        // there isn’t neccessary a body
+        if (doc.body) {
+            doc.body.appendChild(sb);
+        } else if (doc) {
+            doc.addEventListener('DOMContentLoaded', function () {
+                doc.body.appendChild(sb);
+            });
+        }
 
-		q('.smartbanner-button', sb).addEventListener('click', this.install.bind(this), false);
-		q('.smartbanner-close', sb).addEventListener('click', this.close.bind(this), false);
-	},
-	hide: function () {
-		root.classList.remove('smartbanner-show');
-		root.classList.remove('smartbanner-' + this.options.placement);
+        q('.smartbanner-button', sb).addEventListener('click', this.install.bind(this), false);
+        q('.smartbanner-close', sb).addEventListener('click', this.close.bind(this), false);
+    },
+    hide: function () {
+        root.classList.remove('smartbanner-show');
+        root.classList.remove('smartbanner-' + this.options.placement);
 
-		if (typeof this.options.close === 'function') {
-			return this.options.close();
-		}
-	},
-	show: function () {
-		root.classList.add('smartbanner-show');
-		root.classList.add('smartbanner-' + this.options.placement);
+        if (typeof this.options.close === 'function') {
+            return this.options.close();
+        }
+    },
+    show: function () {
+        root.classList.add('smartbanner-show');
+        root.classList.add('smartbanner-' + this.options.placement);
 
-		if (typeof this.options.show === 'function') {
-			return this.options.show();
-		}
-	},
-	close: function () {
-		this.hide();
-		cookie.set(this.appId + '-smartbanner-closed', 'true', {
-			path: '/',
-			expires: new Date(Number(new Date()) + (this.options.daysHidden * 1000 * 60 * 60 * 24))
-		});
-		if (typeof this.options.close === 'function') {
-			return this.options.close();
-		}
-	},
-	install: function () {
-		this.hide();
-		cookie.set(this.appId + '-smartbanner-installed', 'true', {
-			path: '/',
-			expires: new Date(Number(new Date()) + (this.options.daysReminder * 1000 * 60 * 60 * 24))
-		});
-		if (typeof this.options.close === 'function') {
-			return this.options.close();
-		}
-	},
-	parseAppId: function () {
-		var meta = q('meta[name="' + this.appMeta + '"]');
-		if (!meta) {
-			return;
-		}
+        if (typeof this.options.show === 'function') {
+            return this.options.show();
+        }
+    },
+    close: function () {
+        this.hide();
+        cookie.set(this.appId + '-smartbanner-closed', 'true', {
+            path: '/',
+            expires: new Date(Number(new Date()) + (this.options.daysHidden * 1000 * 60 * 60 * 24))
+        });
+        if (typeof this.options.close === 'function') {
+            return this.options.close();
+        }
+    },
+    install: function () {
+        this.hide();
+        cookie.set(this.appId + '-smartbanner-installed', 'true', {
+            path: '/',
+            expires: new Date(Number(new Date()) + (this.options.daysReminder * 1000 * 60 * 60 * 24))
+        });
+        if (typeof this.options.close === 'function') {
+            return this.options.close();
+        }
+    },
+    parseAppId: function () {
+        var meta = q('meta[name="' + this.appMeta + '"]');
+        if (!meta) {
+            return;
+        }
 
-		if (this.type === 'windows') {
-			this.appId = meta.getAttribute('content');
-		} else {
-			this.appId = /app-id=([^\s,]+)/.exec(meta.getAttribute('content'))[1];
-		}
+        if (this.type === 'windows') {
+            this.appId = meta.getAttribute('content');
+        } else {
+            this.appId = /app-id=([^\s,]+)/.exec(meta.getAttribute('content'))[1];
+        }
 
-		return this.appId;
-	}
+        return this.appId;
+    }
 };
 
 module.exports = SmartBanner;
@@ -380,7 +408,7 @@ module.exports = shouldUseNative() ? Object.assign : function (target, source) {
 
 },{}],7:[function(require,module,exports){
 /////////////////////////////////////////////////////////////////////////////////
-/* UAParser.js v0.7.38
+/* UAParser.js v0.7.39
    Copyright © 2012-2021 Faisal Salman <f@faisalman.com>
    MIT License *//*
    Detect Browser, Engine, OS, CPU, and Device type/model from User-Agent data.
@@ -398,7 +426,7 @@ module.exports = shouldUseNative() ? Object.assign : function (target, source) {
     /////////////
 
 
-    var LIBVERSION  = '0.7.38',
+    var LIBVERSION  = '0.7.39',
         EMPTY       = '',
         UNKNOWN     = '?',
         FUNC_TYPE   = 'function',
@@ -441,7 +469,8 @@ module.exports = shouldUseNative() ? Object.assign : function (target, source) {
         ZEBRA   = 'Zebra',
         FACEBOOK    = 'Facebook',
         CHROMIUM_OS = 'Chromium OS',
-        MAC_OS  = 'Mac OS';
+        MAC_OS  = 'Mac OS',
+        SUFFIX_BROWSER = ' Browser';
 
     ///////////
     // Helper
@@ -552,7 +581,7 @@ module.exports = shouldUseNative() ? Object.assign : function (target, source) {
                     return (i === UNKNOWN) ? undefined : i;
                 }
             }
-            return str;
+            return map.hasOwnProperty('*') ? map['*'] : str;
     };
 
     ///////////////
@@ -613,17 +642,20 @@ module.exports = shouldUseNative() ? Object.assign : function (target, source) {
             /\bb[ai]*d(?:uhd|[ub]*[aekoprswx]{5,6})[\/ ]?([\w\.]+)/i            // Baidu
             ], [VERSION, [NAME, 'Baidu']], [
             /(kindle)\/([\w\.]+)/i,                                             // Kindle
-            /(lunascape|maxthon|netfront|jasmine|blazer)[\/ ]?([\w\.]*)/i,      // Lunascape/Maxthon/Netfront/Jasmine/Blazer
+            /(lunascape|maxthon|netfront|jasmine|blazer|sleipnir)[\/ ]?([\w\.]*)/i,      
+                                                                                // Lunascape/Maxthon/Netfront/Jasmine/Blazer/Sleipnir
             // Trident based
             /(avant|iemobile|slim)\s?(?:browser)?[\/ ]?([\w\.]*)/i,             // Avant/IEMobile/SlimBrowser
             /(?:ms|\()(ie) ([\w\.]+)/i,                                         // Internet Explorer
 
             // Webkit/KHTML based                                               // Flock/RockMelt/Midori/Epiphany/Silk/Skyfire/Bolt/Iron/Iridium/PhantomJS/Bowser/QupZilla/Falkon
-            /(flock|rockmelt|midori|epiphany|silk|skyfire|bolt|iron|vivaldi|iridium|phantomjs|bowser|quark|qupzilla|falkon|rekonq|puffin|brave|whale(?!.+naver)|qqbrowserlite|qq|duckduckgo)\/([-\w\.]+)/i,
-                                                                                // Rekonq/Puffin/Brave/Whale/QQBrowserLite/QQ, aka ShouQ
-            /(heytap|ovi)browser\/([\d\.]+)/i,                                  // Heytap/Ovi
+            /(flock|rockmelt|midori|epiphany|silk|skyfire|ovibrowser|bolt|iron|vivaldi|iridium|phantomjs|bowser|qupzilla|falkon|rekonq|puffin|brave|whale(?!.+naver)|qqbrowserlite|duckduckgo|klar|helio)\/([-\w\.]+)/i,
+                                                                                // Rekonq/Puffin/Brave/Whale/QQBrowserLite/QQ//Vivaldi/DuckDuckGo/Klar/Helio
+            /(heytap|ovi)browser\/([\d\.]+)/i,                                  // HeyTap/Ovi
             /(weibo)__([\d\.]+)/i                                               // Weibo
             ], [NAME, VERSION], [
+            /quark(?:pc)?\/([-\w\.]+)/i                                         // Quark
+            ], [VERSION, [NAME, 'Quark']], [
             /\bddg\/([\w\.]+)/i                                                 // DuckDuckGo
             ], [VERSION, [NAME, 'DuckDuckGo']], [
             /(?:\buc? ?browser|(?:juc.+)ucweb)[\/ ]?([\w\.]+)/i                 // UCBrowser
@@ -657,9 +689,11 @@ module.exports = shouldUseNative() ? Object.assign : function (target, source) {
             /fxios\/([-\w\.]+)/i                                                // Firefox for iOS
             ], [VERSION, [NAME, FIREFOX]], [
             /\bqihu|(qi?ho?o?|360)browser/i                                     // 360
-            ], [[NAME, '360 ' + BROWSER]], [
-            /(oculus|sailfish|huawei|vivo)browser\/([\w\.]+)/i
-            ], [[NAME, /(.+)/, '$1 ' + BROWSER], VERSION], [                    // Oculus/Sailfish/HuaweiBrowser/VivoBrowser
+            ], [[NAME, '360' + SUFFIX_BROWSER]], [
+            /\b(qq)\/([\w\.]+)/i                                                // QQ
+            ], [[NAME, /(.+)/, '$1Browser'], VERSION], [
+            /(oculus|sailfish|huawei|vivo|pico)browser\/([\w\.]+)/i
+            ], [[NAME, /(.+)/, '$1' + SUFFIX_BROWSER], VERSION], [              // Oculus/Sailfish/HuaweiBrowser/VivoBrowser/PicoBrowser
             /samsungbrowser\/([\w\.]+)/i                                        // Samsung Internet
             ], [VERSION, [NAME, SAMSUNG + ' Internet']], [
             /(comodo_dragon)\/([\w\.]+)/i                                       // Comodo Dragon
@@ -672,7 +706,7 @@ module.exports = shouldUseNative() ? Object.assign : function (target, source) {
             /(tesla)(?: qtcarbrowser|\/(20\d\d\.[-\w\.]+))/i,                   // Tesla
             /m?(qqbrowser|2345Explorer)[\/ ]?([\w\.]+)/i                        // QQBrowser/2345 Browser
             ], [NAME, VERSION], [
-            /(lbbrowser)/i,                                                     // LieBao Browser
+            /(lbbrowser|rekonq)/i,                                              // LieBao Browser/Rekonq
             /\[(linkedin)app\]/i                                                // LinkedIn App for iOS & Android
             ], [NAME], [
 
@@ -718,23 +752,24 @@ module.exports = shouldUseNative() ? Object.assign : function (target, source) {
             // Gecko based
             /(navigator|netscape\d?)\/([-\w\.]+)/i                              // Netscape
             ], [[NAME, 'Netscape'], VERSION], [
+            /(wolvic)\/([\w\.]+)/i                                              // Wolvic
+            ], [NAME, VERSION], [
             /mobile vr; rv:([\w\.]+)\).+firefox/i                               // Firefox Reality
             ], [VERSION, [NAME, FIREFOX+' Reality']], [
             /ekiohf.+(flow)\/([\w\.]+)/i,                                       // Flow
             /(swiftfox)/i,                                                      // Swiftfox
-            /(icedragon|iceweasel|camino|chimera|fennec|maemo browser|minimo|conkeror|klar)[\/ ]?([\w\.\+]+)/i,
-                                                                                // IceDragon/Iceweasel/Camino/Chimera/Fennec/Maemo/Minimo/Conkeror/Klar
+            /(icedragon|iceweasel|camino|chimera|fennec|maemo browser|minimo|conkeror)[\/ ]?([\w\.\+]+)/i,
+                                                                                // IceDragon/Iceweasel/Camino/Chimera/Fennec/Maemo/Minimo/Conkeror
             /(seamonkey|k-meleon|icecat|iceape|firebird|phoenix|palemoon|basilisk|waterfox)\/([-\w\.]+)$/i,
                                                                                 // Firefox/SeaMonkey/K-Meleon/IceCat/IceApe/Firebird/Phoenix
             /(firefox)\/([\w\.]+)/i,                                            // Other Firefox-based
             /(mozilla)\/([\w\.]+) .+rv\:.+gecko\/\d+/i,                         // Mozilla
 
             // Other
-            /(polaris|lynx|dillo|icab|doris|amaya|w3m|netsurf|sleipnir|obigo|mosaic|(?:go|ice|up)[\. ]?browser)[-\/ ]?v?([\w\.]+)/i,
-                                                                                // Polaris/Lynx/Dillo/iCab/Doris/Amaya/w3m/NetSurf/Sleipnir/Obigo/Mosaic/Go/ICE/UP.Browser
-            /(links) \(([\w\.]+)/i,                                             // Links
-            /panasonic;(viera)/i                                                // Panasonic Viera
-            ], [NAME, VERSION], [
+            /(polaris|lynx|dillo|icab|doris|amaya|w3m|netsurf|obigo|mosaic|(?:go|ice|up)[\. ]?browser)[-\/ ]?v?([\w\.]+)/i,
+                                                                                // Polaris/Lynx/Dillo/iCab/Doris/Amaya/w3m/NetSurf/Obigo/Mosaic/Go/ICE/UP.Browser
+            /(links) \(([\w\.]+)/i                                              // Links
+            ], [NAME, [VERSION, /_/g, '.']], [
             
             /(cobalt)\/([\w\.]+)/i                                              // Cobalt
             ], [NAME, [VERSION, /master.|lts./, ""]]
@@ -781,8 +816,8 @@ module.exports = shouldUseNative() ? Object.assign : function (target, source) {
             // Samsung
             /\b(sch-i[89]0\d|shw-m380s|sm-[ptx]\w{2,4}|gt-[pn]\d{2,4}|sgh-t8[56]9|nexus 10)/i
             ], [MODEL, [VENDOR, SAMSUNG], [TYPE, TABLET]], [
-            /\b((?:s[cgp]h|gt|sm)-\w+|sc[g-]?[\d]+a?|galaxy nexus)/i,
-            /samsung[- ]([-\w]+)/i,
+            /\b((?:s[cgp]h|gt|sm)-(?![lr])\w+|sc[g-]?[\d]+a?|galaxy nexus)/i,
+            /samsung[- ]((?!sm-[lr])[-\w]+)/i,
             /sec-(sgh\w+)/i
             ], [MODEL, [VENDOR, SAMSUNG], [TYPE, MOBILE]], [
 
@@ -813,7 +848,7 @@ module.exports = shouldUseNative() ? Object.assign : function (target, source) {
             /\b(hm[-_ ]?note?[_ ]?(?:\d\w)?) bui/i,                             // Xiaomi Hongmi
             /\b(redmi[\-_ ]?(?:note|k)?[\w_ ]+)(?: bui|\))/i,                   // Xiaomi Redmi
             /oid[^\)]+; (m?[12][0-389][01]\w{3,6}[c-y])( bui|; wv|\))/i,        // Xiaomi Redmi 'numeric' models
-            /\b(mi[-_ ]?(?:a\d|one|one[_ ]plus|note lte|max|cc)?[_ ]?(?:\d?\w?)[_ ]?(?:plus|se|lite)?)(?: bui|\))/i // Xiaomi Mi
+            /\b(mi[-_ ]?(?:a\d|one|one[_ ]plus|note lte|max|cc)?[_ ]?(?:\d?\w?)[_ ]?(?:plus|se|lite|pro)?)(?: bui|\))/i // Xiaomi Mi
             ], [[MODEL, /_/g, ' '], [VENDOR, XIAOMI], [TYPE, MOBILE]], [
             /oid[^\)]+; (2\d{4}(283|rpbf)[cgl])( bui|\))/i,                     // Redmi Pad
             /\b(mi[-_ ]?(?:pad)(?:[\w_ ]+))(?: bui|\))/i                        // Mi Pad tablets
@@ -881,7 +916,7 @@ module.exports = shouldUseNative() ? Object.assign : function (target, source) {
 
             // Amazon
             /(alexa)webm/i,
-            /(kf[a-z]{2}wi|aeo[c-r]{2})( bui|\))/i,                             // Kindle Fire without Silk / Echo Show
+            /(kf[a-z]{2}wi|aeo(?!bc)\w\w)( bui|\))/i,                           // Kindle Fire without Silk / Echo Show
             /(kf[a-z]+)( bui|\)).+silk\//i                                      // Kindle Fire HD
             ], [MODEL, [VENDOR, AMAZON], [TYPE, TABLET]], [
             /((?:sd|kf)[0349hijorstuw]+)( bui|\)).+silk\//i                     // Fire Phone
@@ -910,6 +945,14 @@ module.exports = shouldUseNative() ? Object.assign : function (target, source) {
             /(alcatel|geeksphone|nexian|panasonic(?!(?:;|\.))|sony(?!-bra))[-_ ]?([-\w]*)/i         // Alcatel/GeeksPhone/Nexian/Panasonic/Sony
             ], [VENDOR, [MODEL, /_/g, ' '], [TYPE, MOBILE]], [
 
+            // TCL
+            /droid [\w\.]+; ((?:8[14]9[16]|9(?:0(?:48|60|8[01])|1(?:3[27]|66)|2(?:6[69]|9[56])|466))[gqswx])\w*(\)| bui)/i
+            ], [MODEL, [VENDOR, 'TCL'], [TYPE, TABLET]], [
+
+            // itel
+            /(itel) ((\w+))/i
+            ], [[VENDOR, lowerize], MODEL, [TYPE, strMapper, { 'tablet' : ['p10001l', 'w7001'], '*' : 'mobile' }]], [
+
             // Acer
             /droid.+; ([ab][1-7]-?[0178a]\d\d?)/i
             ], [MODEL, [VENDOR, 'Acer'], [TYPE, TABLET]], [
@@ -922,6 +965,10 @@ module.exports = shouldUseNative() ? Object.assign : function (target, source) {
             // Ulefone
             /; ((?:power )?armor(?:[\w ]{0,8}))(?: bui|\))/i
             ], [MODEL, [VENDOR, 'Ulefone'], [TYPE, MOBILE]], [
+
+            // Nothing
+            /droid.+; (a(?:015|06[35]|142p?))/i
+            ], [MODEL, [VENDOR, 'Nothing'], [TYPE, MOBILE]], [
 
             // MIXED
             /(blackberry|benq|palm(?=\-)|sonyericsson|acer|asus|dell|meizu|motorola|polytron|infinix|tecno)[-_ ]?([-\w]*)/i,
@@ -1053,6 +1100,8 @@ module.exports = shouldUseNative() ? Object.assign : function (target, source) {
             // WEARABLES
             ///////////////////
 
+            /\b(sm-[lr]\d\d[05][fnuw]?s?)\b/i                                   // Samsung Galaxy Watch
+            ], [MODEL, [VENDOR, SAMSUNG], [TYPE, WEARABLE]], [
             /((pebble))app/i                                                    // Pebble
             ], [VENDOR, MODEL, [TYPE, WEARABLE]], [
             /(watch)(?: ?os[,\/]|\d,\d\/)[\d\.]+/i                              // Apple Watch
