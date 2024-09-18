@@ -2,17 +2,17 @@
 <html lang="en">
 <head>
     <title>MyPage</title>
-    <meta name="apple-itunes-app" content="app-id=502838820">
-    <meta name="google-play-app" content="app-id=ru.hh.android">
+<!--    <meta name="apple-itunes-app" content="app-id=502838820">-->
+<!--    <meta name="google-play-app" content="app-id=ru.hh.android">-->
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
     <link rel="stylesheet" href="./smart-app-banner.min.css" type="text/css" media="screen">
-    <link rel="apple-touch-icon" href="http://lh3.ggpht.com/f4oX61ljZ6x8aYDELZOgxlvdUEu73-wSQ4fy5bx6fCRISnZP8T353wdaM43RO_DbGg=w300">
-    <link rel="android-touch-icon" href="http://lh3.ggpht.com/f4oX61ljZ6x8aYDELZOgxlvdUEu73-wSQ4fy5bx6fCRISnZP8T353wdaM43RO_DbGg=w300">
+<!--    <link rel="apple-touch-icon" href="http://lh3.ggpht.com/f4oX61ljZ6x8aYDELZOgxlvdUEu73-wSQ4fy5bx6fCRISnZP8T353wdaM43RO_DbGg=w300">-->
+<!--    <link rel="android-touch-icon" href="http://lh3.ggpht.com/f4oX61ljZ6x8aYDELZOgxlvdUEu73-wSQ4fy5bx6fCRISnZP8T353wdaM43RO_DbGg=w300">-->
 </head>
 <body>
 <h1>Smart app banner</h1>
-<script src="./smart-app-banner.min.js"></script>
+<script src="./smart-app-banner.js"></script>
 <script type="text/javascript">
     new SmartBanner({
         daysHidden: 15,         // days to hide banner after close button is clicked (defaults to 15)
@@ -21,6 +21,10 @@
         title: 'MyPage',
         author: 'MyCompany LLC',
         button: 'View',
+        app: {
+            ios: '502838820',
+            android: 'ru.hh.android',
+        },
         store: {
             ios: 'On the App Store',
             android: 'In Google Play',
@@ -32,10 +36,10 @@
             windows: 'FREE'
         },
         theme: 'ios-light', // put platform type ('android', 'ios', 'ios-light', 'ios-black') here to force single theme on all device
-        // icon: '',           // full path to icon image if not using website icon image
+        icon: 'http://lh3.ggpht.com/f4oX61ljZ6x8aYDELZOgxlvdUEu73-wSQ4fy5bx6fCRISnZP8T353wdaM43RO_DbGg=w300',           // full path to icon image if not using website icon image
         // force: 'ios',       // Uncomment for platform emulation
         placement: 'bottom',   // put the banner at the top ('top') or bottom ('bottom') of the screen
-        lazy: true,           // lazy load banner only when user interacts with page
+        lazy: false,           // lazy load banner only when user interacts with page
     });
 </script>
 </body>

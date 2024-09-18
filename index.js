@@ -44,6 +44,11 @@ var SmartBanner = function (options) {
         daysReminder: 90,
         appStoreLanguage: userLang, // Language code for App Store
         button: 'OPEN', // Text for the install button
+        app: {
+            ios: null, // The id for the app in the App Store if not using meta tag
+            android: null, // The id for the app in Google Play Store if not using meta tag
+            windows: null // The id for the app in the Windows Store if not using meta tag
+        },
         store: {
             ios: 'On the App Store',
             android: 'In Google Play',
@@ -83,6 +88,9 @@ var SmartBanner = function (options) {
 
     this.appMeta = mixins[this.type].appMeta;
     this.parseAppId();
+    if (!this.appId) {
+        return;
+    }
 
     var isMobileSafari = (this.type === 'ios' && agent.browser.name === 'Mobile Safari' && parseInt(agent.os.version, 10) >= 6);
 
@@ -90,8 +98,15 @@ var SmartBanner = function (options) {
     var userDismissed = cookie.get(this.appId + '-smartbanner-closed');
     var userInstalled = cookie.get(this.appId + '-smartbanner-installed');
 
-    if (isMobileSafari || runningStandAlone || userDismissed || userInstalled) {
+    if (runningStandAlone || userDismissed || userInstalled) {
         return;
+    }
+
+    if (isMobileSafari) {
+        var meta = q('meta[name="' + this.appMeta + '"]');
+        if (meta) {
+            return;
+        }
     }
 
     extend(this, mixins[this.type]);
@@ -172,7 +187,7 @@ SmartBanner.prototype = {
             '</a>' +
             '</div>';
 
-        // there isn’t neccessary a body
+        // there isn’t necessary a body
         if (doc.body) {
             doc.body.appendChild(sb);
         } else if (doc) {
@@ -223,6 +238,9 @@ SmartBanner.prototype = {
     parseAppId: function () {
         var meta = q('meta[name="' + this.appMeta + '"]');
         if (!meta) {
+            if (typeof this.options.app[this.type] != 'undefined') {
+                this.appId = this.options.app[this.type];
+            }
             return;
         }
 
